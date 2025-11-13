@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  dida365-client:
+    build: .
+    container_name: dida365-wechat-client
+    volumes:
+      # 映射data目录到宿主机，用于持久化token缓存
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: never
+    
+    # 定时运行（可选）
+    # 您可以使用外部的cron调度器来定期执行此容器
