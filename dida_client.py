@@ -107,3 +107,54 @@ class DidaClient:
             print(f"Error getting project data for project {project_id}: {e.response.status_code}")
             print(f"Response body: {e.response.text}")
             return None
+
+    def get_inbox_data(self):
+        """
+        Fetches all tasks from the inbox (no project assigned).
+        In滴答清单, inbox tasks might be under project with id 'inbox' or special endpoint.
+        """
+        # 尝试不同的收集箱获取方式
+        possible_inbox_ids = ['inbox', '0', 'default', '']
+
+        for inbox_id in possible_inbox_ids:
+            try:
+                # 方法1: 作为特殊项目获取
+                url = f"{API_BASE_URL}/project/{inbox_id}/data"
+                response = self.client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data and 'tasks' in data:
+                        print(f"  ✓ 找到收集箱 (ID: {inbox_id}), 任务数: {len(data['tasks'])}")
+                        return data
+
+                # 方法2: 使用collect接口（如果存在）
+                url2 = f"{API_BASE_URL}/project/collect/data"
+                response2 = self.client.get(url2)
+                if response2.status_code == 200:
+                    data = response2.json()
+                    if data and 'tasks' in data:
+                        print(f"  ✓ 找到收集箱 (collect接口), 任务数: {len(data['tasks'])}")
+                        return data
+
+            except httpx.HTTPStatusError:
+                continue
+
+        # 方法3: 直接获取所有任务并筛选无项目的任务
+        try:
+            all_tasks = []
+            for project in self.get_projects() or []:
+                project_data = self.get_project_data(project['id'])
+                if project_data and 'tasks' in project_data:
+                    all_tasks.extend(project_data['tasks'])
+
+            # 收集箱任务：没有assignee或特定标记的任务
+            inbox_tasks = [task for task in all_tasks if task.get('projectId') == 'inbox' or task.get('inbox', False)]
+
+            if inbox_tasks:
+                print(f"  ✓ 筛选找到收集箱任务: {len(inbox_tasks)} 条")
+                return {'tasks': inbox_tasks}
+
+        except Exception as e:
+            print(f"  ✗ 筛选收集箱任务失败: {e}")
+
+        return None
